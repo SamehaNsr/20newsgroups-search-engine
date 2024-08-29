@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Engine</title>
+    <link rel="icon" href="{% static 'search.png' %}" type="image/png">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="{% static 'jquery.js' %}"></script>
+</head>
+<style>
+    .custom-container {
+        max-width: 80%; /* Adjust the percentage as needed */
+        margin: 0 auto; /* Center the container */
+        background-color: #E1E5F8;
+    }
+    .formatted-text {
+    white-space: pre-wrap;
+    font-family: Arial, sans-serif;
+    line-height: 1.5;
+    }
+    .highlight {
+            color: #2218A7; /* Tomato color */
+            font-weight: bold;
+    }
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+    }
+    #suggestions-list {
+    position: absolute;
+    top: 100%; /* Places the list directly below the search bar */
+    left: 9%;
+    width: 100%; /* Matches the width of the search bar */
+    background-color: white;
+    border: 1px solid #ccc;
+    z-index: 1000; /* Ensures the list appears above other elements */
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Optional: Adds a shadow for better visibility */
+}
+    .suggestions-list li {
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+
+    .suggestions-list li:hover {
+        background-color: #f0f0f0;
+    }
+    .footer {
+    background-color: #333; /* Dark background */
+    color: #fff; /* White text */
+    padding: 15px 0; /* Padding for spacing */
+    text-align: center; /* Center the text */
+    position: fixed; /* Fix the footer at the bottom */
+    bottom: 0;
+    width: 100%;
+    }
+
+    .footer a {
+        color: #737CCF; /* Link color */
+        text-decoration: none; /* Remove underline */
+    }
+
+    .footer a:hover {
+        text-decoration: underline; /* Underline on hover */
+    }
+
+    .footer p {
+        margin: 0; /* Remove default margin */
+    }
+
+    .footer-container {
+        width: 90%;
+        margin: 0 auto; /* Center the container */
+    }
+
+</style>
+
+<body class="bg-light">
+    <div class="custom-container mt-5">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="text-center mb-4" style="color: #28104E;">20NewsGroups Search Engine</h1>
+    
+                <!-- Search Form -->
+                <div class="search-container" style="position: relative;">
+                <form method="GET" action="{% url 'search' %}" class="form-inline justify-content-center mb-4">
+                    <input id="search-bar" type="text" name="query" class="form-control w-75" placeholder="Enter your search query" required value="{{ request.GET.query }}" autocomplete="off">
+                    <ul id="suggestions-list" class="suggestions-list w-75" style="display: none;"></ul>
+                    <button id="submit-button" type="submit" class="btn btn-primary ml-2" style="background-color: #737CCF;">Search</button>
+                </form>
+                </div>
+
+                <!-- Container for displaying the corrected query -->
+            <div id="corrected-query-container" style="display: none; margin-top: 10px;">
+                Did you mean: <a href="#" id="corrected-query-link"></a>
+            </div>
+    
+                <!-- Results -->
+                <h2 class="text-left" style="color: #28104E;">Results</h2>
+                <ul class="list-group">
+                    {% for result in results %}
+                        <li class="result-item list-group-item mb-4">{{ result }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <footer class="footer">
+        <div class="footer-container">
+            <p>&copy; <span id="current-year"></span> Sameha Nasr | <a href="https://www.linkedin.com/in/sameha-nasr-389552219" target="_blank">LinkedIn</a></p>
+            <!-- <a href="samehanasr123321@gmail.com">samehanasr123321@gmail.com</a>  -->
+        </div>
+    </footer>    
+<script>
+    function addNewLines(text) {
+        // Regex to identify sentence endings followed by a capital letter
+        const pattern = /(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!)(?=\s[A-Z])/g;
+
+        //Remove extra whitespaces (more than one space) between words
+        text = text.replace(/\s+/g, ' ');
+
+        // Add a new line after each period that indicates the end of a sentence
+        text = text.replace(/(\.|\?|\!)\s/g, '$1<br>');
+
+        // Replace with a break and a new line
+        return text.replace(pattern, '$&<br>');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const resultItems = document.querySelectorAll('.result-item');
+        resultItems.forEach(item => {
+            item.innerHTML = addNewLines(item.textContent);
+        });
+        resultItems.forEach(item => {
+            const text = item.innerHTML;
+            const highlightedText = text.replace(/(Newsgroup: .+)/g, '$1<br>'+'<span class="highlight">$1</span>');
+            item.innerHTML = highlightedText;
+        });
+    });
+</script>
+<script>
+// autocomplete.js
+$(document).ready(function() {
+    $('#search-bar').on('input', function() {
+        var query = $(this).val().trim();
+
+        if (query.length > 1) {
+            $.ajax({
+                url: '{% url "autocomplete" %}',
+                data: { 'query': query },
+                success: function(data) {
+                    var suggestions = data.suggestions;
+                    var suggestionsList = $('#suggestions-list');
+                    suggestionsList.empty();
+
+                    if (suggestions.length > 0) {
+                        suggestions.forEach(function(suggestion) {
+                            suggestionsList.append('<li>' + suggestion + '</li>');
+                        });
+                        suggestionsList.show();
+                    } else {
+                        suggestionsList.hide();
+                    }
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('AJAX request failed:', textStatus, errorThrown);
+                }
+            });
+        } else {
+            $('#suggestions-list').hide();
+        }
+    });
+
+    $('#suggestions-list').on('click', 'li', function() {
+        var suggestion = $(this).text();
+        var currentValue = $('#search-bar').val();
+        var newValue;
+
+        // If the current value ends with a space or is empty, replace it
+        if (currentValue.trim().length === 0 || currentValue.trim().endsWith(' ')) {
+            newValue = currentValue.trim() + suggestion;
+        } else {
+            // Replace the last word with the selected suggestion
+            // newValue = currentValue.trim() +' ' + suggestion;
+            newValue = currentValue.replace(/.*$/, suggestion);
+        }
+
+        $('#search-bar').val(newValue);
+        $('#suggestions-list').hide();
+    });
+
+    $(document).on('click', function(event) {
+        if (!$(event.target).closest('#search-bar, #suggestions-list').length) {
+            $('#suggestions-list').hide();
+        }
+    });
+});
+
+$(document).ready(function() {
+    $('#submit-button').on('click', function(event) {
+        event.preventDefault(); // Prevent the form from submitting immediately
+
+        var query = $('#search-bar').val().trim().toLowerCase();
+
+        if (query.length > 0) {
+            $.ajax({
+                url: '{% url "autocorrect" %}',
+                data: { 'query': query },
+                success: function(data) {
+                    var correctedQuery = data.corrected_query;
+                    if (correctedQuery && correctedQuery !== query) {
+                        $('#corrected-query-link').text(correctedQuery);
+                        $('#corrected-query-link').attr('href', '/search?query=' + encodeURIComponent(correctedQuery));
+                        $('#corrected-query-container').show();
+                    } else {
+                        // No correction needed, submit the form directly
+                        $('form').submit();
+                    }
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('AJAX request failed:', textStatus, errorThrown);
+                    $('form').submit(); // On error, submit the form directly
+                }
+            });
+        } else {
+            $('form').submit(); // Submit if query is empty
+        }
+    });
+
+    // Handle the corrected query link click
+    $('#corrected-query-link').on('click', function(event) {
+        event.preventDefault();
+        var correctedQuery = $(this).text();
+        $('#search-bar').val(correctedQuery);
+        $('form').submit();
+    });
+});
+document.getElementById('current-year').textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
